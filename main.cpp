@@ -2,16 +2,21 @@
 #include <cmath>
 #include <iomanip>
 #include <limits>
-#include <fstream> // Pour l'exportation et la lecture des fichiers
+#include <fstream>  // Pour l'exportation et la lecture des fichiers
+#include <ctime>    // Pour horodatation
 
 using namespace std;
 
-// Fonction pour afficher le menu
+// Déclarations des variables
+double R = 0.0, L = 0.0, C = 0.0, f = 0.0; // Résistance, Inductance, Capacité, Fréquence
+bool rKnown = false, lKnown = false, cKnown = false, fKnown = false; // Statut des valeurs connues
+
+// Fonction pour afficher le menu principal
 void afficherMenu() {
     cout << "==== Menu ====\n";
-    cout << "1. Saisir les valeurs de R et f0\n";
-    cout << "2. Calculer L et C\n";
-    cout << "3. Convertir les unités de L et C\n";
+    cout << "1. Spécifier les valeurs connues (R, L, C, f)\n";
+    cout << "2. Calculer les valeurs inconnues\n";
+    cout << "3. Afficher les conversions des unités\n";
     cout << "4. Exporter les résultats dans un fichier\n";
     cout << "5. Quitter\n";
     cout << "Votre choix : ";
@@ -34,26 +39,53 @@ double saisirValeurPositive(const string &nom) {
     }
 }
 
-// Fonction pour saisir une fréquence dans un intervalle donné
-double saisirFrequence() {
-    double frequence;
-    while (true) {
-        cout << "Entrez la fréquence centrale f0 (entre 20 Hz et 20000 Hz) : ";
-        cin >> frequence;
+// Fonction pour spécifier les valeurs connues
+void specifierValeursConnues() {
+    int choix;
+    cout << "Quelles valeurs connaissez-vous ?\n";
+    cout << "1. Résistance R\n";
+    cout << "2. Inductance L\n";
+    cout << "3. Capacité C\n";
+    cout << "4. Fréquence f\n";
+    cout << "5. Terminer la spécification\n";
 
-        if (cin.fail() || frequence < 20 || frequence > 20000) {
-            cin.clear();
-            cin.ignore(numeric_limits<streamsize>::max(), '\n');
-            cout << "Erreur : la fréquence doit être comprise entre 20 Hz et 20000 Hz.\n";
-        } else {
-            return frequence;
+    do {
+        cout << "Votre choix : ";
+        cin >> choix;
+        switch (choix) {
+            case 1:
+                R = saisirValeurPositive("R (Ohms)");
+                rKnown = true;
+                break;
+            case 2:
+                L = saisirValeurPositive("L (Henrys)");
+                lKnown = true;
+                break;
+            case 3:
+                C = saisirValeurPositive("C (Farads)");
+                cKnown = true;
+                break;
+            case 4:
+                f = saisirValeurPositive("f (Hz)");
+                fKnown = true;
+                break;
+            case 5:
+                cout << "Spécification terminée.\n";
+                break;
+            default:
+                cout << "Choix invalide. Veuillez réessayer.\n";
         }
-    }
+    } while (choix != 5);
 }
 
 // Fonction pour convertir et afficher les unités de L et C
-void afficherConversions(double L, double C) {
-    cout << "\nConversion des unités :\n";
+void afficherConversions() {
+    if (!lKnown || !cKnown) {
+        cout << "Veuillez d'abord calculer ou spécifier les valeurs de L et C.\n";
+        return;
+    }
+
+    cout << "\nConversions des unités :\n";
 
     // Inductance (L)
     cout << "Inductance (L) :\n";
@@ -67,21 +99,72 @@ void afficherConversions(double L, double C) {
     cout << " - " << C << " F (Farads)\n";
     cout << " - " << C * 1e9 << " nF (nanofarads)\n";
     cout << " - " << C * 1e12 << " pF (picofarads)\n";
+}
 
-    // Avertissements pour des valeurs non réalistes
-    if (L > 1 || L < 1e-12) {
-        cout << "Avertissement : La valeur de L (" << L << " H) semble non réaliste.\n";
+// Fonction pour calculer le facteur de qualité Q
+double calculerFacteurQualite() {
+    if (!rKnown || !lKnown || !cKnown) {
+        cout << "Q ne peut pas être calculé : valeurs manquantes pour R, L, ou C.\n";
+        return -1;
     }
-    if (C > 1 || C < 1e-12) {
-        cout << "Avertissement : La valeur de C (" << C << " F) semble non réaliste.\n";
+    return (1 / R) * sqrt(L / C);
+}
+
+// Fonction pour calculer les valeurs inconnues
+void calculerValeurs() {
+    if (fKnown && rKnown) {
+        // Calcul de C et L
+        double omega0 = 2 * M_PI * f;
+        C = 1 / (R * omega0);
+        L = 1 / (omega0 * omega0 * C);
+        cKnown = true;
+        lKnown = true;
+        cout << "Calculé à partir de R et f :\n";
+        cout << "Capacité C = " << C << " F\n";
+        cout << "Inductance L = " << L << " H\n";
+    } else if (lKnown && cKnown) {
+        // Calcul de f
+        double omega0 = 1 / sqrt(L * C);
+        f = omega0 / (2 * M_PI);
+        fKnown = true;
+        cout << "Calculé à partir de L et C :\n";
+        cout << "Fréquence f = " << f << " Hz\n";
+    } else if (fKnown && cKnown) {
+        // Calcul de R
+        double omega0 = 2 * M_PI * f;
+        R = 1 / (omega0 * C);
+        rKnown = true;
+        cout << "Calculé à partir de f et C :\n";
+        cout << "Résistance R = " << R << " Ohms\n";
+    } else if (fKnown && lKnown) {
+        // Calcul de C et R
+        double omega0 = 2 * M_PI * f;
+        C = 1 / (L * omega0 * omega0);
+        R = 1 / (omega0 * C);
+        cKnown = true;
+        rKnown = true;
+        cout << "Calculé à partir de f et L :\n";
+        cout << "Capacité C = " << C << " F\n";
+        cout << "Résistance R = " << R << " Ohms\n";
+    } else {
+        cout << "Pas assez de données pour effectuer les calculs.\n";
     }
 }
 
-// Fonction pour exporter les résultats dans un fichier avec un nom personnalisé
-void exporterResultats(double R, double f0, double L, double C) {
+// Fonction pour exporter les résultats dans un fichier
+void exporterResultats() {
+    if (!rKnown || !lKnown || !cKnown || !fKnown) {
+        cout << "Veuillez calculer toutes les valeurs avant d'exporter.\n";
+        return;
+    }
+
     string nomFichier;
     cout << "Entrez le nom du fichier d'exportation (par exemple, resultats.txt) : ";
     cin >> nomFichier;
+
+    // Ajouter une horodatation au fichier
+    time_t maintenant = time(0);
+    tm *ltm = localtime(&maintenant);
 
     ofstream fichier(nomFichier);
     if (!fichier) {
@@ -89,14 +172,24 @@ void exporterResultats(double R, double f0, double L, double C) {
         return;
     }
 
-    fichier << "Résultats calculés :\n";
+    fichier << "Résultats calculés (Date : ";
+    fichier << 1900 + ltm->tm_year << "-" 
+            << 1 + ltm->tm_mon << "-" 
+            << ltm->tm_mday << " ";
+    fichier << ltm->tm_hour << ":" 
+            << ltm->tm_min << ":" 
+            << ltm->tm_sec << "):\n";
+
     fichier << fixed << setprecision(12);
     fichier << "R = " << R << " Ohms\n";
-    fichier << "f0 = " << f0 << " Hz\n";
-    fichier << "Inductance L = " << L << " H\n";
-    fichier << "Capacité C = " << C << " F\n";
-    fichier << "\nConversions des unités :\n";
+    fichier << "f = " << f << " Hz\n";
+    fichier << "L = " << L << " H\n";
+    fichier << "C = " << C << " F\n";
 
+    double Q = calculerFacteurQualite();
+    fichier << "Facteur de qualité Q = " << Q << "\n\n";
+
+    fichier << "Conversions des unités :\n";
     fichier << "Inductance (L) :\n";
     fichier << " - " << L << " H\n";
     fichier << " - " << L * 1e3 << " mH\n";
@@ -109,24 +202,9 @@ void exporterResultats(double R, double f0, double L, double C) {
 
     fichier.close();
     cout << "Résultats exportés dans le fichier '" << nomFichier << "'.\n";
-
-    // Afficher le contenu du fichier
-    cout << "\nContenu du fichier '" << nomFichier << "' :\n";
-    ifstream fichierLecture(nomFichier);
-    string ligne;
-    if (fichierLecture.is_open()) {
-        while (getline(fichierLecture, ligne)) {
-            cout << ligne << '\n';
-        }
-        fichierLecture.close();
-    } else {
-        cout << "Erreur lors de l'ouverture du fichier pour lecture.\n";
-    }
 }
 
 int main() {
-    double R = 0.0, f0 = 0.0; // Résistance et fréquence centrale
-    double L = 0.0, C = 0.0;  // Inductance et capacité
     int choix;
 
     do {
@@ -135,52 +213,20 @@ int main() {
 
         switch (choix) {
             case 1:
-                // Saisir R et f0 avec gestion des erreurs
-                R = saisirValeurPositive("la résistance R (Ohms)");
-                f0 = saisirFrequence();
-                cout << "Valeurs enregistrées avec succès :\n";
-                cout << "R = " << R << " Ohms, f0 = " << f0 << " Hz.\n";
+                specifierValeursConnues();
                 break;
-
             case 2:
-                if (R == 0 || f0 == 0) {
-                    cout << "Veuillez d'abord entrer les valeurs valides de R et f0.\n";
-                } else {
-                    // Calcul des valeurs de L et C
-                    double omega0 = 2 * M_PI * f0; // Calcul de ω0
-                    C = 1 / (R * omega0);         // C = 1 / (R * ω0)
-                    L = 1 / (pow(omega0, 2) * C); // L = 1 / (ω0^2 * C)
-
-                    // Affichage des résultats
-                    cout << fixed << setprecision(12);
-                    cout << "Pour R = " << R << " Ohms et f0 = " << f0 << " Hz :\n";
-                    cout << "Inductance L = " << L << " H\n";
-                    cout << "Capacité C = " << C << " F\n";
-                }
+                calculerValeurs();
                 break;
-
             case 3:
-                if (L == 0 || C == 0) {
-                    cout << "Veuillez d'abord calculer les valeurs de L et C.\n";
-                } else {
-                    // Afficher les conversions des unités
-                    afficherConversions(L, C);
-                }
+                afficherConversions();
                 break;
-
             case 4:
-                if (L == 0 || C == 0) {
-                    cout << "Veuillez d'abord calculer les valeurs de L et C.\n";
-                } else {
-                    // Exporter les résultats dans un fichier
-                    exporterResultats(R, f0, L, C);
-                }
+                exporterResultats();
                 break;
-
             case 5:
                 cout << "Programme terminé. Au revoir !\n";
                 break;
-
             default:
                 cout << "Choix invalide. Veuillez réessayer.\n";
                 break;

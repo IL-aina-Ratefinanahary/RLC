@@ -8,13 +8,13 @@
 using namespace std;
 
 // Déclarations des variables
-double R = 0.0, L = 0.0, C = 0.0, f = 0.0; // Résistance, Inductance, Capacité, Fréquence
-bool rKnown = false, lKnown = false, cKnown = false, fKnown = false; // Statut des valeurs connues
+double R = 0.0, L = 0.0, C = 0.0, f = 0.0, Q = 0.0; // Résistance, Inductance, Capacité, Fréquence, Facteur de qualité
+bool rKnown = false, lKnown = false, cKnown = false, fKnown = false, qKnown = false; // Statut des valeurs connues
 
 // Fonction pour afficher le menu principal
 void afficherMenu() {
     cout << "==== Menu ====\n";
-    cout << "1. Spécifier les valeurs connues (R, L, C, f)\n";
+    cout << "1. Spécifier les valeurs connues (R, L, C, f, Q)\n";
     cout << "2. Calculer les valeurs inconnues\n";
     cout << "3. Afficher les conversions des unités\n";
     cout << "4. Exporter les résultats dans un fichier\n";
@@ -47,7 +47,8 @@ void specifierValeursConnues() {
     cout << "2. Inductance L\n";
     cout << "3. Capacité C\n";
     cout << "4. Fréquence f\n";
-    cout << "5. Terminer la spécification\n";
+    cout << "5. Facteur de qualité Q\n";
+    cout << "6. Terminer la spécification\n";
 
     do {
         cout << "Votre choix : ";
@@ -70,12 +71,16 @@ void specifierValeursConnues() {
                 fKnown = true;
                 break;
             case 5:
+                Q = saisirValeurPositive("Q (Facteur de qualité)");
+                qKnown = true;
+                break;
+            case 6:
                 cout << "Spécification terminée.\n";
                 break;
             default:
                 cout << "Choix invalide. Veuillez réessayer.\n";
         }
-    } while (choix != 5);
+    } while (choix != 6);
 }
 
 // Fonction pour convertir et afficher les unités de L et C
@@ -99,15 +104,6 @@ void afficherConversions() {
     cout << " - " << C << " F (Farads)\n";
     cout << " - " << C * 1e9 << " nF (nanofarads)\n";
     cout << " - " << C * 1e12 << " pF (picofarads)\n";
-}
-
-// Fonction pour calculer le facteur de qualité Q
-double calculerFacteurQualite() {
-    if (!rKnown || !lKnown || !cKnown) {
-        cout << "Q ne peut pas être calculé : valeurs manquantes pour R, L, ou C.\n";
-        return -1;
-    }
-    return (1 / R) * sqrt(L / C);
 }
 
 // Fonction pour calculer les valeurs inconnues
@@ -136,16 +132,20 @@ void calculerValeurs() {
         rKnown = true;
         cout << "Calculé à partir de f et C :\n";
         cout << "Résistance R = " << R << " Ohms\n";
-    } else if (fKnown && lKnown) {
-        // Calcul de C et R
-        double omega0 = 2 * M_PI * f;
-        C = 1 / (L * omega0 * omega0);
-        R = 1 / (omega0 * C);
-        cKnown = true;
-        rKnown = true;
-        cout << "Calculé à partir de f et L :\n";
-        cout << "Capacité C = " << C << " F\n";
-        cout << "Résistance R = " << R << " Ohms\n";
+    } else if (qKnown && rKnown) {
+        // Calcul de L et C à partir de Q et R
+        if (fKnown) {
+            double omega0 = 2 * M_PI * f;
+            C = 1 / (R * omega0);
+            L = Q * Q * C * R * R;
+            lKnown = true;
+            cKnown = true;
+            cout << "Calculé à partir de Q, R, et f :\n";
+            cout << "Inductance L = " << L << " H\n";
+            cout << "Capacité C = " << C << " F\n";
+        } else {
+            cout << "Fréquence f est nécessaire pour utiliser Q et R.\n";
+        }
     } else {
         cout << "Pas assez de données pour effectuer les calculs.\n";
     }
@@ -186,8 +186,9 @@ void exporterResultats() {
     fichier << "L = " << L << " H\n";
     fichier << "C = " << C << " F\n";
 
-    double Q = calculerFacteurQualite();
-    fichier << "Facteur de qualité Q = " << Q << "\n\n";
+    if (qKnown) {
+        fichier << "Facteur de qualité Q = " << Q << "\n";
+    }
 
     fichier << "Conversions des unités :\n";
     fichier << "Inductance (L) :\n";

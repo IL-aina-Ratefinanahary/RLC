@@ -1,3 +1,4 @@
+//Réalisé par : IL'aina R.
 #include <iostream>
 #include <cmath>
 #include <iomanip>
@@ -207,7 +208,7 @@ void exporterResultats() {
 
 int main() {
     int choix;
-
+    //Menu utilisateur
     do {
         afficherMenu();
         cin >> choix;
